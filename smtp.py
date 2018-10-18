@@ -3,8 +3,8 @@
 - Fall 2017
 - Lab N
 - Names:
-  - 
-  - 
+  - Seth Fenske
+  - Angad Singh
 
 A simple email sending program.
 
