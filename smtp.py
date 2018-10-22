@@ -56,7 +56,7 @@ def main():
     (username, password) = login_gui()
 
     message_info = {}
-    message_info['To'] = 'sebern@msoe.edu'
+    message_info['To'] = 'fenskesd@msoe.edu'
     message_info['From'] = username
     message_info['Subject'] = 'Yet another test message'
     message_info['Date'] = 'Thu, 9 Oct 2014 23:56:09 +0000'
@@ -125,7 +125,6 @@ def center_gui_on_screen(gui, gui_width, gui_height):
 
 # *** Do not modify code above this line ***
 
-
 def smtp_send(password, message_info, message_text):
     """Send a message via SMTP.
 
@@ -137,10 +136,90 @@ def smtp_send(password, message_info, message_text):
                 'Subject': Email subject
             Other keys can be added to support other email headers, etc.
     """
-    pass  # Replace this line with your code
+    sock = create_socket()
+    print(read_line(sock))
+    sock.send(b"EHLO msoe.edu\r\n\r\n")
+    response = readResponse(sock)
+
+    for i in response:
+        print(i)
+
+def read_line(sock):
+    """
+    Returns the byte data from a socket until the CRLF characters.
+    :param sock: The socket to read data from
+    :return: The message in bytes
+    :author: Seth Fenske
+    """
+    message = b''
+    second_byte = sock.recv(1)
+    first_byte = sock.recv(1)
+
+    while second_byte + first_byte != b'\r\n':
+        message += second_byte
+        second_byte = first_byte
+        first_byte = sock.recv(1)
+    return message
 
 
-# Your code and additional functions go here. (Replace this line, too.)
+def readResponse(sock):
+    """
+    Reads from the socket and returns all the lines of the response
+    :param sock: Socket to read from
+    :return: A list of all responses
+    :author: Seth Fenske
+    """
+    messages = []
+    last_line = read_line(sock)
+
+    while line_contains_character(last_line, b'-'):
+        last_line = read_line(sock)
+        messages.append(last_line)
+    return messages
+
+def split_at_char(message_bytes, character, remove_CRLF):
+    """
+    Takes a bytestring message as an argument, and splits it at the character specified. If the remove_CRLF is true,
+     the last two characters are truncated if they are CRLF.
+    :param message_bytes: The message to be split
+    :param character: The character to remove
+    :param remove_CRLF: Boolean value to determine if the line ends in a CRLF, whether or not to remove it.
+    :return: A tuple of each half of the split.
+    :author: Seth Fenske
+    """
+    halves = message_bytes.split(character)
+    if halves(0).contains(b'\r\n') and remove_CRLF:
+        return halves(0), halves(1)[0, len(halves(1))-2]
+    else:
+        return halves(0), halves(1)
+
+def line_contains_character(message, character):
+    """
+    Checks to see if the supplied message contains the supplied character
+    :param message: Message to check
+    :param character: The character we are looking for
+    :return: A boolean representing whether or not the message contains the character
+    :author: Seth Fenske
+    """
+    current_byte = b""
+    message_length = len(message)
+    index = 0
+    byte_found = False
+    while index < message_length and not(byte_found):
+        current_byte = message[index: index + 1]
+        byte_found = current_byte == character
+        index += 1
+    return byte_found
+
+def create_socket():
+    """
+    Returns a new TCP socket.
+    :return: A socket to be used to communicate with the SMTP server
+    :author: Seth Fenske
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((SMTP_SERVER, SMTP_PORT))
+    return sock
 
 # ** Do not modify code below this line. **
 
