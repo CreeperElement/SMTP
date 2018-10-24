@@ -56,7 +56,7 @@ def main():
     (username, password) = login_gui()
 
     message_info = {}
-    message_info['To'] = 'fenskesd@msoe.edu'
+    message_info['To'] = 'singhanga@msoe.edu'
     message_info['From'] = username
     message_info['Subject'] = 'Yet another test message'
     message_info['Date'] = 'Thu, 9 Oct 2014 23:56:09 +0000'
@@ -151,6 +151,7 @@ def smtp_send(password, message_info, message_text):
                 'Date': Date string for current date/time in SMTP format
                 'Subject': Email subject
             Other keys can be added to support other email headers, etc.
+    :authors: Angad Singh and Seth Fenske
     """
     sock = create_socket()
     print(read_line(sock))
@@ -165,6 +166,26 @@ def smtp_send(password, message_info, message_text):
         print(i)
 
     authenticate(auth_sock, password, message_info)
+
+    mail_from = "MAIL FROM:" + message_info['From'] + "\r\n"
+    auth_sock.send(mail_from.encode())
+    print(read_line(auth_sock).decode())
+    rcpt_to = "RCPT TO:" + message_info['To'] + "\r\n"
+    auth_sock.send(rcpt_to.encode())
+    print(read_line(auth_sock).decode())
+    auth_sock.send(b'DATA\r\n')
+    print(read_line(auth_sock).decode())
+    subject = "Subject: testing my client\r\n\r\n"
+    auth_sock.send(subject.encode())
+    date = get_formatted_date()
+    date = date + "\r\n\r\n"
+    auth_sock.send(date.encode())
+    auth_sock.send(message_text.encode())
+    auth_sock.send(b'\r\n.\r\n')  # to end the message
+    print(read_line(auth_sock).decode())
+    auth_sock.send(b'QUIT\r\n')  # sending command to quit
+    print(read_line(auth_sock).decode())
+    auth_sock.close()
 
 def start_tls(sock):
     """
