@@ -125,6 +125,22 @@ def center_gui_on_screen(gui, gui_width, gui_height):
 
 # *** Do not modify code above this line ***
 
+def authenticate(auth_sock, password, message_info):
+    """
+    Runs through the authentication process.
+    :param auth_sock: Secure sock to do authentication
+    :param password: User Password
+    :param message_info: Dictionary containing "From:"
+    :return: None
+    """
+    send_bytes(auth_sock, b"AUTH LOGIN")
+    print(read_line(auth_sock))
+    send_base_64(auth_sock, message_info["From"])
+    print(read_line(auth_sock))
+    send_base_64(auth_sock, password)
+    print(read_line(auth_sock))
+
+
 def smtp_send(password, message_info, message_text):
     """Send a message via SMTP.
 
@@ -138,11 +154,45 @@ def smtp_send(password, message_info, message_text):
     """
     sock = create_socket()
     print(read_line(sock))
-    sock.send(b"EHLO msoe.edu\r\n\r\n")
-    response = readResponse(sock)
-
+    send_bytes(sock, b"EHLO msoe.edu")
+    response = read_response(sock)
     for i in response:
         print(i)
+    auth_sock = start_tls(sock)
+    send_bytes(auth_sock, b"EHLO msoe.edu")
+    response = read_response(auth_sock)
+    for i in response:
+        print(i)
+
+    authenticate(auth_sock, password, message_info)
+
+def start_tls(sock):
+    """
+    Starts the tls service, and wraps the socket in an encrypted socket
+    :param sock: The socket we are using
+    :return: Tbe POST tls encrypted socket
+    """
+    send_bytes(sock, b'STARTTLS')
+
+    response = read_line(sock)
+    response_code, response_body = split_at_char(response, b" ", True)
+    if response_code != b'220':
+        print(response_code)
+        raise Exception("Invalid server response to login authentication")
+    secure_sock = get_secure_socket(sock)
+    return secure_sock
+
+
+def get_secure_socket(sock):
+    """
+    Returns a secured socket.
+    :param sock: Original socket
+    :return: Secured socket
+    :author: Seth Fenske
+    """
+    context = ssl.create_default_context()
+    wrapped_socket = context.wrap_socket(sock, server_hostname=SMTP_SERVER)
+    return wrapped_socket
 
 def read_line(sock):
     """
@@ -162,7 +212,7 @@ def read_line(sock):
     return message
 
 
-def readResponse(sock):
+def read_response(sock):
     """
     Reads from the socket and returns all the lines of the response
     :param sock: Socket to read from
@@ -171,11 +221,45 @@ def readResponse(sock):
     """
     messages = []
     last_line = read_line(sock)
-
+    messages.append(last_line)
     while line_contains_character(last_line, b'-'):
         last_line = read_line(sock)
         messages.append(last_line)
     return messages
+
+def read_until_character(sock, character):
+    """
+    Reads data from the socket until
+    :param sock: The socket to read from
+    :return: The data in bytes up to and not including the character
+    :author: Seth Fenske
+    """
+    last_byte = sock.recv(1)
+    message = b''
+    while last_byte != character:
+        message += last_byte
+        last_byte = sock.recv(1)
+    return message
+
+def send_bytes(sock, message):
+    """
+    Sends the message through the socket, adding the line endings
+    :param sock: Socket to send data
+    :param message: Message to send, without line endings
+    :return: None
+    :author: Seth Fenske
+    """
+    print("C: " + (message + b'\r\n').decode("ASCII"))
+    sock.sendall(message + b'\r\n')
+
+def send_base_64(sock, message):
+    """
+    Sends the message in base64 encoding.
+    :param sock: The secure sock to use
+    :param message: The message to be sent
+    :return: None
+    """
+    send_bytes(sock, base64.b64encode(message.encode("ASCII")))
 
 def split_at_char(message_bytes, character, remove_CRLF):
     """
@@ -188,10 +272,10 @@ def split_at_char(message_bytes, character, remove_CRLF):
     :author: Seth Fenske
     """
     halves = message_bytes.split(character)
-    if halves(0).contains(b'\r\n') and remove_CRLF:
+    if b'\r\n' in halves[0] and remove_CRLF:
         return halves(0), halves(1)[0, len(halves(1))-2]
     else:
-        return halves(0), halves(1)
+        return halves[0], halves[1]
 
 def line_contains_character(message, character):
     """
